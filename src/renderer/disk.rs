@@ -11,7 +11,7 @@ use byte_unit::{Byte, Unit};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph, Sparkline};
+use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Sparkline};
 use ratatui::Frame;
 use std::borrow::Cow;
 
@@ -21,7 +21,7 @@ pub fn render_disk(
     f: &mut Frame<'_>,
     view: View,
     border_style: Style,
-    file_system_index: &usize,
+    fs_list_state: &mut ListState,
     file_system_display: &FileSystemDisplay,
 ) {
     let (disk_layout, view) = split_left_right_pane("Disk", layout, f, view, border_style);
@@ -31,45 +31,34 @@ pub fn render_disk(
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
         .split(disk_layout[1]);
 
+    let file_system_index = fs_list_state.selected().unwrap_or(0);
     if *file_system_display == FileSystemDisplay::Activity {
-        disk_activity_histogram(app, f, view, &area, file_system_index);
+        disk_activity_histogram(app, f, view, &area, &file_system_index);
     } else {
-        disk_usage(app, f, view, &area, file_system_index);
+        disk_usage(app, f, view, &area, &file_system_index);
     }
     let mut disk_list: Vec<_> = app.disks.values().collect();
     disk_list.sort_by(|a, b| b.mount_point.cmp(&a.mount_point));
     let disks: Vec<_> = disk_list
         .iter()
-        .enumerate()
-        .map(|(i, d)| {
+        .map(|d| {
             let style = if d.get_perc_free_space() < 10.0 {
                 max_style()
             } else {
                 ok_style()
             };
-            if *file_system_index == i {
-                Span::styled(
-                    Cow::Owned(format!(
-                        "→{:3.0}%: {}",
-                        d.get_perc_free_space(),
-                        d.mount_point.display()
-                    )),
-                    style,
-                )
-            } else {
-                Span::styled(
-                    Cow::Owned(format!(
-                        " {:3.0}%: {}",
-                        d.get_perc_free_space(),
-                        d.mount_point.display()
-                    )),
-                    style,
-                )
-            }
+            Span::styled(
+                Cow::Owned(format!(
+                    " {:3.0}%: {}",
+                    d.get_perc_free_space(),
+                    d.mount_point.display()
+                )),
+                style,
+            )
         })
         .map(ListItem::new)
         .collect();
-    List::new(disks)
+    let disks_list = List::new(disks)
         .block(
             Block::default()
                 .title(Span::styled(
@@ -79,7 +68,8 @@ pub fn render_disk(
                 .borders(Borders::ALL)
                 .border_style(border_style),
         )
-        .render(f, disk_layout[0]);
+        .highlight_symbol("→");
+    f.render_stateful_widget(disks_list, disk_layout[0], fs_list_state);
 }
 fn disk_activity_histogram(
     app: &CPUTimeApp,

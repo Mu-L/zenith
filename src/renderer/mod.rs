@@ -188,6 +188,7 @@ pub struct TerminalRenderer<'a> {
     gfx_device_index: usize,
     gfx_list_state: ListState,
     file_system_index: usize,
+    fs_list_state: ListState,
     file_system_display: FileSystemDisplay,
     /// Index in the vector below is "order" on the screen starting from the top
     /// (usually CPU) while value is the section it belongs to and its current height (as %).
@@ -256,6 +257,7 @@ impl TerminalRenderer<'_> {
             gfx_device_index: 0,
             gfx_list_state: ListState::default(),
             file_system_index: 0,
+            fs_list_state: ListState::default(),
             file_system_display: FileSystemDisplay::Activity,
             section_geometry: section_geometry.clone(),
             zoom_factor: 1,
@@ -404,15 +406,18 @@ impl TerminalRenderer<'_> {
                     Section::Network => {
                         network::render_net(&self.app, v_section, f, view, border_style)
                     }
-                    Section::Disk => disk::render_disk(
-                        &self.app,
-                        v_section,
-                        f,
-                        view,
-                        border_style,
-                        &self.file_system_index,
-                        &self.file_system_display,
-                    ),
+                    Section::Disk => {
+                        self.fs_list_state.select(Some(self.file_system_index));
+                        disk::render_disk(
+                            &self.app,
+                            v_section,
+                            f,
+                            view,
+                            border_style,
+                            &mut self.fs_list_state,
+                            &self.file_system_display,
+                        )
+                    }
                     Section::Graphics => {
                         self.gfx_list_state.select(Some(self.gfx_device_index));
                         graphics::render_graphics(
