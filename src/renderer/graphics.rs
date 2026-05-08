@@ -11,7 +11,7 @@ use byte_unit::{Byte, Unit};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, List, ListItem, Sparkline};
+use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Sparkline};
 use ratatui::Frame;
 use std::borrow::Cow;
 
@@ -20,7 +20,7 @@ pub fn render_graphics(
     layout: Rect,
     f: &mut Frame<'_>,
     view: View,
-    gfx_device_index: &usize,
+    gfx_list_state: &mut ListState,
     border_style: Style,
 ) {
     Block::default()
@@ -47,7 +47,7 @@ pub fn render_graphics(
         ..view
     };
 
-    let gd = &app.gfx_devices[*gfx_device_index];
+    let gd = &app.gfx_devices[gfx_list_state.selected().unwrap_or(0)];
     let h_gpu = match app
         .histogram_map
         .get_zoomed(&HistogramKind::GpuUse(gd.uuid.clone()), &view)
@@ -156,30 +156,26 @@ pub fn render_graphics(
     let devices: Vec<_> = app
         .gfx_devices
         .iter()
-        .enumerate()
-        .map(|(i, d)| {
-            let indicator = if i == *gfx_device_index { "→" } else { " " };
+        .map(|d| {
             let style = if d.gpu_utilization > 90 {
                 max_style()
             } else {
                 ok_style()
             };
             Span::styled(
-                Cow::Owned(format!(
-                    "{}{:3.0}%: {}",
-                    indicator, d.gpu_utilization, d.name
-                )),
+                Cow::Owned(format!(" {:3.0}%: {}", d.gpu_utilization, d.name)),
                 style,
             )
         })
         .map(ListItem::new)
         .collect();
-    List::new(devices)
+    let devices_list = List::new(devices)
         .block(
             Block::default()
                 .title(Span::styled("Graphics Devices", border_style))
                 .borders(Borders::ALL)
                 .border_style(border_style),
         )
-        .render(f, gfx_layout[0]);
+        .highlight_symbol("→");
+    f.render_stateful_widget(devices_list, gfx_layout[0], gfx_list_state);
 }

@@ -34,7 +34,7 @@ use std::time::{Duration, Instant};
 
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Style};
-use ratatui::widgets::{Block, Borders};
+use ratatui::widgets::{Block, Borders, ListState};
 use ratatui::Frame;
 
 const PROCESS_SELECTION_GRACE: Duration = Duration::from_millis(2000);
@@ -186,6 +186,7 @@ pub struct TerminalRenderer<'a> {
     process_table_row_start: usize,
     process_table_height: u16,
     gfx_device_index: usize,
+    gfx_list_state: ListState,
     file_system_index: usize,
     file_system_display: FileSystemDisplay,
     /// Index in the vector below is "order" on the screen starting from the top
@@ -253,6 +254,7 @@ impl TerminalRenderer<'_> {
             process_table_row_start: 0,
             process_table_height: 0,
             gfx_device_index: 0,
+            gfx_list_state: ListState::default(),
             file_system_index: 0,
             file_system_display: FileSystemDisplay::Activity,
             section_geometry: section_geometry.clone(),
@@ -411,14 +413,17 @@ impl TerminalRenderer<'_> {
                         &self.file_system_index,
                         &self.file_system_display,
                     ),
-                    Section::Graphics => graphics::render_graphics(
-                        &self.app,
-                        v_section,
-                        f,
-                        view,
-                        &self.gfx_device_index,
-                        border_style,
-                    ),
+                    Section::Graphics => {
+                        self.gfx_list_state.select(Some(self.gfx_device_index));
+                        graphics::render_graphics(
+                            &self.app,
+                            v_section,
+                            f,
+                            view,
+                            &mut self.gfx_list_state,
+                            border_style,
+                        )
+                    }
                     Section::Process => {
                         if let Some(p) = self.app.selected_process.as_ref() {
                             process::render_process(
